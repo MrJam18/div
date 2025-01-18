@@ -1,4 +1,7 @@
 <?php
+
+use yii\web\Response;
+
 $params = array_merge(
     require __DIR__ . '/../../common/config/params.php',
     require __DIR__ . '/../../common/config/params-local.php',
@@ -9,12 +12,21 @@ $params = array_merge(
 return [
     'id' => 'app-frontend',
     'basePath' => dirname(__DIR__),
-    'bootstrap' => ['log'],
+    'bootstrap' => [
+        [
+            'class' => \yii\filters\ContentNegotiator::class,
+            'formats' => [
+                'application/json' => Response::FORMAT_JSON,
+            ]
+        ]
+    ],
     'controllerNamespace' => 'frontend\controllers',
+    'container' => [
+        'definitions' => [
+            \frontend\components\providers\RequestProvider::class => \frontend\components\providers\RequestProvider::class
+        ]
+    ],
     'components' => [
-        'request' => [
-            'csrfParam' => '_csrf-frontend',
-        ],
         'user' => [
             'identityClass' => 'common\models\User',
             'enableAutoLogin' => true,
@@ -36,14 +48,36 @@ return [
         'errorHandler' => [
             'errorAction' => 'site/error',
         ],
-        /*
         'urlManager' => [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
+            'enableStrictParsing' => false,
             'rules' => [
+                'POST <controller>' => '<controller>/create',
+                '<controller>' => '<controller>/index',
+                'PUT <controller>/<id:\d+>'    => '<controller>/update',
+                '<controller:[\w-]+>/<id:\d+>'        => '<controller>/view',
+            ]
+        ],
+        'request' => [
+            'enableCsrfValidation' => false,
+            'parsers' => [
+                'application/json' => 'yii\web\JsonParser',
+            ]
+        ],
+        'response' => [
+            'format' => Response::FORMAT_JSON,
+            // ...
+            'formatters' => [
+                Response::FORMAT_JSON => [
+                    'class' => 'yii\web\JsonResponseFormatter',
+                    'prettyPrint' => YII_DEBUG,
+                    'encodeOptions' => JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+                    // ...
+                ],
             ],
         ],
-        */
     ],
+
     'params' => $params,
 ];

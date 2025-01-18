@@ -1,4 +1,7 @@
 <?php
+
+use yii\web\Response;
+
 return [
     'aliases' => [
         '@bower' => '@vendor/bower-asset',
