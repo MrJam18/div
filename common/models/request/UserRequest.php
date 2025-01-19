@@ -16,6 +16,9 @@ use yii\db\ActiveRecord;
  * @property int $created_at
  * @property int $updated_at
  * @property ?int $responsible_user_id
+ *
+ * @property UserRequestStatus $status
+ * @property User $responsibleUser
  */
 class UserRequest extends ActiveRecord
 {
@@ -28,7 +31,7 @@ class UserRequest extends ActiveRecord
           [['name', 'email', 'message', 'comment',], 'string'],
           ['name', 'string', 'length' => [4, 24]],
           ['email', 'email'],
-          [['name', 'email', 'message'], 'required'],
+          [['name', 'email', 'message', 'comment'], 'required'],
         ];
     }
 
@@ -38,6 +41,16 @@ class UserRequest extends ActiveRecord
             self::SCENARIO_CREATE => ['name', 'email', 'message'],
             self::SCENARIO_RESOLVE => ['name', 'email', 'message', 'comment'],
         ];
+    }
+
+    public function beforeSave($insert): bool
+    {
+        $now = (new \DateTime())->format('Y-m-d H:i:s');
+        $this->updated_at = $now;
+        if($insert) {
+            $this->created_at = $now;
+        }
+        return parent::beforeSave($insert);
     }
 
     public function getStatus(): ActiveQuery

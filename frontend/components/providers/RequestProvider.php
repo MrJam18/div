@@ -39,12 +39,21 @@ class RequestProvider extends Model
 
     public function search(): array
     {
-        $query = UserRequest::find();
-        $query->andFilterWhere([
+        $query = UserRequest::find()->andFilterWhere([
             'user_request_status_id' => $this->status,
-        ])->andFilterWhere([
-            'between', 'created_at', $this->created_at . ' 00:00:00', $this->created_at . ' 23:59:59',
+        ])->joinWith([
+            'status'
         ]);
-        return $query->asArray()->all();
+        if($this->created_at) {
+            $query->andWhere([
+                'between', 'created_at', $this->created_at . ' 00:00:00', $this->created_at . ' 23:59:59',
+            ]);
+        }
+        $data = $query->all();
+        return array_map(function (UserRequest $item) {
+            $data = $item->toArray();
+            $data['status'] = $item->status->name;
+            return $data;
+        }, $data);
     }
 }

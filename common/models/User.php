@@ -22,12 +22,18 @@ use yii\web\IdentityInterface;
  * @property integer $created_at
  * @property integer $updated_at
  * @property string $password write-only password
+ * @property integer $auth_key_expired_at
+ * @property integer $type
  */
 class User extends ActiveRecord implements IdentityInterface
 {
     const STATUS_DELETED = 0;
     const STATUS_INACTIVE = 9;
     const STATUS_ACTIVE = 10;
+
+    public const int TYPE_OTHER = 1;
+    public const int TYPE_RESPONSIBLE = 2;
+
 
 
     /**
@@ -70,9 +76,12 @@ class User extends ActiveRecord implements IdentityInterface
     /**
      * {@inheritdoc}
      */
-    public static function findIdentityByAccessToken($token, $type = null)
+    public static function findIdentityByAccessToken($token, $type = null): ?static
     {
-        throw new NotSupportedException('"findIdentityByAccessToken" is not implemented.');
+        $now = (new \DateTime())->format('Y-m-d H:i:s');
+        return static::find()->where(['auth_key' => $token])->andWhere([
+            '>', 'auth_key_expired_at', $now
+        ])->one();
     }
 
     /**
@@ -83,7 +92,7 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public static function findByUsername($username)
     {
-        return static::findOne(['username' => $username, 'status' => self::STATUS_ACTIVE]);
+        return static::findOne(['username' => $username]);
     }
 
     /**
@@ -185,6 +194,7 @@ class User extends ActiveRecord implements IdentityInterface
     public function generateAuthKey()
     {
         $this->auth_key = Yii::$app->security->generateRandomString();
+        $this->auth_key_expired_at = (new \DateTime())->modify('+6 months')->format('Y-m-d H:i:s');
     }
 
     /**
@@ -209,5 +219,10 @@ class User extends ActiveRecord implements IdentityInterface
     public function removePasswordResetToken()
     {
         $this->password_reset_token = null;
+    }
+
+    public function isResponsible(): bool
+    {
+        return $this->type === self::TYPE_RESPONSIBLE;
     }
 }

@@ -8,7 +8,7 @@ use yii\base\Model;
 /**
  * Login form
  */
-class LoginForm extends Model
+class LoginForm extends CustomModel
 {
     public $username;
     public $password;
@@ -57,7 +57,7 @@ class LoginForm extends Model
     public function login()
     {
         if ($this->validate()) {
-            return Yii::$app->user->login($this->getUser(), $this->rememberMe ? 3600 * 24 * 30 : 0);
+            return Yii::$app->user->login($this->getUser());
         }
         
         return false;
@@ -68,7 +68,7 @@ class LoginForm extends Model
      *
      * @return User|null
      */
-    protected function getUser()
+    public function getUser()
     {
         if ($this->_user === null) {
             $this->_user = User::findByUsername($this->username);

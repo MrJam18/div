@@ -2,30 +2,44 @@
 
 namespace frontend\controllers;
 
+use app\controllers\ApiController;
 use common\models\request\UserRequest;
 use common\models\request\UserRequestStatus;
 use frontend\components\providers\RequestProvider;
-use yii\base\Model;
-use yii\db\ActiveRecord;
+use Yii;
 use yii\filters\AccessControl;
-use yii\web\Controller;
+use yii\filters\auth\HttpBearerAuth;
+use yii\filters\Cors;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
-class RequestsController extends Controller
+class RequestsController extends ApiController
 {
 
     public function behaviors(): array
     {
         return [
-            'access' => [
+            'basicAuth' => [
+                'class' => HttpBearerAuth::class,
+                'only' => ['index', 'update'],
+            ],
+            'accessControl' => [
                 'class' => AccessControl::class,
                 'only' => ['index', 'update'],
                 'rules' => [
                     [
                         'allow' => true,
-                        'actions' => ['index'],
-                        'roles' => ['@'],
-                    ],
+                        'actions' => ['index', 'update'],
+                        'roles' => ['responsible'],
+                    ]
+                ],
+            ],
+            'corsFilter' => [
+                'class' => Cors::class,
+                'cors' => [
+                    'Origin' => [Yii::$app->params['externalSiteUrl']],
+                    'Access-Control-Allow-Credentials' => true,
+                    'Access-Control-Max-Age' => 86400,
                 ],
             ],
         ];
@@ -38,44 +52,12 @@ class RequestsController extends Controller
         if(!$userRequest->load($this->request->post())) {
             return $this->emptyRequestResponse();
         } elseif ($userRequest->validate()) {
-            $time = (new \DateTime())->format('Y-m-d H:i:s');
-            $userRequest->created_at = $time;
-            $userRequest->updated_at = $time;
             $userRequest->user_request_status_id = UserRequestStatus::STATUS_ACTIVE;
             $userRequest->save();
             return $this->blankResponse();
         } else {
             return $this->validationErrorsResponse($userRequest);
         }
-    }
-
-    private function emptyRequestResponse(): Response
-    {
-        $response = $this->response;
-        $response->statusCode = 400;
-        $response->data = [
-            'error' => 'request data is empty'
-        ];
-        return $response;
-    }
-
-    private function validationErrorsResponse(Model $model): Response
-    {
-        $response = $this->response;
-        $response->statusCode = 400;
-        $response->data = [
-            'error' => 'validation error',
-            'validationErrors' => $model->errors
-        ];
-        return $response;
-    }
-
-    private function blankResponse(int $statusCode = 200): Response
-    {
-        $response = $this->response;
-        $response->statusCode = $statusCode;
-        $response->content = '';
-        return $response;
     }
 
     public function actionIndex(RequestProvider $provider): Response
@@ -87,6 +69,30 @@ class RequestsController extends Controller
         } else {
             return $this->validationErrorsResponse($provider);
         }
+    }
+
+    public function actionUpdate(int $id): Response
+    {
+        $model = UserRequest::findOne($id);
+        if($model === null) {
+            throw new NotFoundHttpException("can't find the user-request with id {$id}");
+        }
+        $model->scenario = UserRequest::SCENARIO_RESOLVE;
+        if($model->load(Yii::$app->request->post()) && $model->validate()) {
+            $model->user_request_status_id = UserRequestStatus::STATUS_RESOLVED;
+            $model->responsible_user_id = Yii::$app->user->id;
+            $model->save();
+            \Yii::$app->mailer->compose('@app/email/requests/reply', [
+                'model' => $model,
+            ])->setFrom(\Yii::$app->params['adminEmail'])
+                ->setTo($model->email)
+                ->setSubject('Ответ на заявку')
+                ->send();
+            return $this->blankResponse();
+        } else {
+            return $this->validationErrorsResponse($model);
+        }
+
     }
 
 
